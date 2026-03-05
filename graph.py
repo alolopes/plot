@@ -1,5 +1,4 @@
 import sys
-import json
 from typing import TypedDict, Dict, Any
 from langgraph.graph import StateGraph, END
 from datetime import datetime
@@ -7,8 +6,17 @@ from datetime import datetime
 from agentes.gerar_estrutura import gerar_estrutura
 from agentes.gerar_capitulo_base import gerar_capitulo_base, normalizar_capitulo
 from agentes.expandir_capitulo import expandir_capitulo
-from utils import criar_pasta_livro, extrair_nome_livro, log_inicio, log_fim
+from utils import (
+    criar_pasta_livro,
+    extrair_nome_livro,
+    log_inicio,
+    log_fim
+)
 
+
+# ==========================================
+# 🔹 STATE
+# ==========================================
 
 class LivroState(TypedDict):
     conteudo_ideia: str
@@ -23,40 +31,47 @@ class LivroState(TypedDict):
     texto_base: str
     texto_expandido: str
     estrutura: Dict[str, Any]
+    force: bool
 
 
-# =============================
-# ETAPA 1 — GERAR E SALVAR ESTRUTURA
-# =============================
+# ==========================================
+# 🔹 ETAPA 1 — ESTRUTURA (COM CACHE)
+# ==========================================
+
 def etapa_estrutura(state: LivroState):
-    log_inicio("Gerando estrutura do Livro")
+    log_inicio("Gerando / Carregando estrutura")
 
     estrutura = gerar_estrutura(
         state["titulo"],
-        state["conteudo_ideia"]
+        state["conteudo_ideia"],
+        force=state.get("force", False)
     )
 
-    # Criar pasta base
-    pasta_base = criar_pasta_livro(state["titulo"])
-    caminho_estrutura = pasta_base / "estrutura.json"
-
-    # Salvar estrutura
-    with caminho_estrutura.open("w", encoding="utf-8") as f:
-        json.dump(estrutura, f, ensure_ascii=False, indent=4)
-
-    print(f"📚 Estrutura salva em: {caminho_estrutura}")
-
-    log_fim("Estrutura gerada")
+    log_fim("Estrutura pronta")
 
     return {"estrutura": estrutura}
 
 
-# =============================
-# ETAPA 2 — SELECIONAR CAPÍTULO
-# =============================
+# ==========================================
+# 🔹 ETAPA 2 — SELECIONAR CAPÍTULO
+# ==========================================
+
 def selecionar_capitulo(state: LivroState):
-    ato = state["estrutura"]["atos"][state["ato_index"]]
-    cap = normalizar_capitulo(ato["capitulos"][state["cap_index"]])
+
+    atos = state["estrutura"]["atos"]
+
+    if state["ato_index"] >= len(atos):
+        return {}
+
+    ato = atos[state["ato_index"]]
+    capitulos = ato["capitulos"]
+
+    if state["cap_index"] >= len(capitulos):
+        return {}
+
+    cap = normalizar_capitulo(
+        capitulos[state["cap_index"]]
+    )
 
     return {
         "dados_capitulo": cap,
@@ -64,10 +79,12 @@ def selecionar_capitulo(state: LivroState):
     }
 
 
-# =============================
-# ETAPA 3 — ESCREVER BASE
-# =============================
+# ==========================================
+# 🔹 ETAPA 3 — ESCREVER BASE
+# ==========================================
+
 def escrever_base(state: LivroState):
+
     texto = gerar_capitulo_base(
         state["titulo"],
         state["dados_capitulo"],
@@ -77,10 +94,12 @@ def escrever_base(state: LivroState):
     return {"texto_base": texto}
 
 
-# =============================
-# ETAPA 4 — EXPANDIR
-# =============================
+# ==========================================
+# 🔹 ETAPA 4 — EXPANDIR
+# ==========================================
+
 def expandir(state: LivroState):
+
     log_inicio(f"Expandindo Capítulo {state['numero_capitulo']}")
 
     texto_rico = expandir_capitulo(
@@ -96,10 +115,12 @@ def expandir(state: LivroState):
     }
 
 
-# =============================
-# ETAPA 5 — VALIDAR
-# =============================
+# ==========================================
+# 🔹 ETAPA 5 — VALIDAR
+# ==========================================
+
 def validar(state: LivroState):
+
     palavras = len(state["texto_expandido"].split())
     valido = palavras >= 400
 
@@ -112,10 +133,12 @@ def validar(state: LivroState):
     return {"valido": valido}
 
 
-# =============================
-# ETAPA 6 — SALVAR CAPÍTULO
-# =============================
+# ==========================================
+# 🔹 ETAPA 6 — SALVAR CAPÍTULO
+# ==========================================
+
 def salvar(state: LivroState):
+
     print(f"💾 Salvando Capítulo {state['numero_capitulo']}...")
 
     pasta_base = criar_pasta_livro(state["titulo"])
@@ -178,9 +201,10 @@ gerado_em: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     }
 
 
-# =============================
-# CONFIGURAÇÃO DO GRAFO
-# =============================
+# ==========================================
+# 🔹 CONFIGURAÇÃO DO GRAFO
+# ==========================================
+
 builder = StateGraph(LivroState)
 
 builder.add_node("estrutura", etapa_estrutura)
@@ -214,14 +238,17 @@ builder.add_conditional_edges(
 graph = builder.compile()
 
 
-# =============================
-# EXECUÇÃO
-# =============================
+# ==========================================
+# 🔹 EXECUÇÃO
+# ==========================================
+
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
-        print("Uso: python graph.py caminho_do_arquivo_ideia.txt")
+        print("Uso: python graph.py caminho_ideia.txt [--force]")
         sys.exit(1)
+
+    force = "--force" in sys.argv
 
     with open(sys.argv[1], "r", encoding="utf-8") as f:
         ideia = f.read()
@@ -236,10 +263,13 @@ if __name__ == "__main__":
         "numero_capitulo": 1,
         "ato_index": 0,
         "cap_index": 0,
-        "tentativas": 0
+        "tentativas": 0,
+        "force": force
     }
 
-    print(f"\n📖 Iniciando geração do livro: {titulo}\n")
+    print(f"\n📖 Iniciando geração do livro: {titulo}")
+    if force:
+        print("⚠ Forçando regeneração da estrutura.")
 
     graph.invoke(initial_state)
 
