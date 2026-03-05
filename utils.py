@@ -4,7 +4,6 @@ from datetime import datetime
 
 def criar_pasta_livro(titulo: str) -> Path:
     """Cria a estrutura de pastas para um livro"""
-    # Garante que o nome da pasta não tenha caracteres inválidos
     nome_limpo = "".join([c if c.isalnum() or c in " _-" else "" for c in titulo]).strip()
     base = Path("livros") / nome_limpo.replace(" ", "_")
     
@@ -14,16 +13,20 @@ def criar_pasta_livro(titulo: str) -> Path:
     
     for p in [base, pasta_memoria, pasta_kindle, pasta_chapters]:
         p.mkdir(parents=True, exist_ok=True)
+    
+    print(f"Estrutura de pastas criada em: {base.resolve()}")
     return base
 
 def extrair_nome_livro(conteudo: str) -> str:
     """Pega apenas o início da primeira linha como nome do livro"""
-    primeira_linha = conteudo.splitlines()[0].strip()
-    # Se a primeira linha for muito longa (descrição), pegamos apenas as 2 primeiras palavras
+    linhas = conteudo.splitlines()
+    if not linhas:
+        return "Livro_Sem_Nome"
+    primeira_linha = linhas[0].strip()
     if len(primeira_linha) > 30:
         palavras = primeira_linha.split()
-        return " ".join(palavras[:2])
-    return primeira_linha
+        return " ".join(palavras[:3])  # aumentei para 3 palavras
+    return primeira_linha or "Livro_Sem_Nome"
 
 def hora_atual() -> str:
     return datetime.now().strftime("%H:%M:%S")
