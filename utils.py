@@ -8,10 +8,10 @@ def criar_pasta_livro(titulo: str) -> Path:
     base = Path("livros") / nome_limpo.replace(" ", "_")
     
     pasta_memoria = base / "memoria"
-    pasta_kindle = pasta_memoria / "kindle_book" / "OEBPS"
-    pasta_chapters = pasta_kindle / "chapters"
+    #pasta_kindle = pasta_memoria / "kindle_book" / "OEBPS"
+    pasta_chapters = pasta_memoria / "capitulos"
     
-    for p in [base, pasta_memoria, pasta_kindle, pasta_chapters]:
+    for p in [base, pasta_memoria, pasta_memoria, pasta_chapters]:
         p.mkdir(parents=True, exist_ok=True)
     
     print(f"Estrutura de pastas criada em: {base.resolve()}")
